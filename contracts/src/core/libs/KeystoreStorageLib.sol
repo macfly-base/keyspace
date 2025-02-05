@@ -38,17 +38,17 @@ library KeystoreStorageLib {
     ///
     /// @custom:storage-location erc7201:storage.ReplicaKeystore
     struct ReplicaKeystoreStorage {
-        /// @dev The hash of the `confirmedConfig`.
-        bytes32 confirmedConfigHash;
-        /// @dev The latest preconfirmed config nonce.
-        uint256 currentConfigNonce;
-        /// @dev The timestamp of the L1 block used to confirm the latest config.
+        /// @dev The hash of the latest synced `masterConfig`.
+        bytes32 masterConfigHash;
+        /// @dev The timestamp of the L1 block used to sync the latest `masterConfig`.
         uint256 masterBlockTimestamp;
-        /// @dev Preconfirmed Keystore config hashes.
-        ///      NOTE: The preconfirmed configs list can NEVER be empty because:
+        /// @dev The latest mirrored config nonce.
+        uint256 currentConfigNonce;
+        /// @dev Mirrored Keystore config hashes.
+        ///      NOTE: The mirrored configs list can NEVER be empty because:
         ///         1. It is initialized in the `_initialize()` method.
-        ///         2. If reset in `confirmConfig()`, the newly confirmed config hash is immediately pushed into it.
-        bytes32[] preconfirmedConfigHashes;
+        ///         2. If reset in `syncConfig()`, the newly synced master config hash is immediately pushed into it.
+        bytes32[] mirroredConfigHashes;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -168,7 +168,7 @@ contract MultiOwnableWallet is OPStackKeystore, ERC1271, TransientUUPSUpgradeabl
     }
 
     /// @inheritdoc Keystore
-    function hookIsNewConfigValid(ConfigLib.Config calldata newConfig, bytes calldata validationProof)
+    function hookIsConfigValid(ConfigLib.Config calldata config, bytes calldata validationProof)
         public
         view
         override
@@ -176,19 +176,16 @@ contract MultiOwnableWallet is OPStackKeystore, ERC1271, TransientUUPSUpgradeabl
     {
         // NOTE: Because this hook is limited to a view function, no special access control logic is required.
 
-        bytes32 newConfigHash = ConfigLib.hash({config: newConfig, account: address(this)});
+        bytes32 configHash = ConfigLib.hash({config: config, account: address(this)});
         (, bytes memory signatureUpdate) = abi.decode(validationProof, (bytes, bytes));
         (uint256 sigUpdateSignerIndex, bytes memory signature) = abi.decode(signatureUpdate, (uint256, bytes));
 
         // Perform a safeguard check to make sure the update is valid.
-        (, address[] memory signers) = abi.decode(newConfig.data, (address, address[]));
+        (, address[] memory signers) = abi.decode(config.data, (address, address[]));
         address sigUpdateSigner = signers[sigUpdateSignerIndex];
 
-        return SignatureCheckerLib.isValidSignatureNow({
-            signer: sigUpdateSigner,
-            hash: newConfigHash,
-            signature: signature
-        });
+        return
+            SignatureCheckerLib.isValidSignatureNow({signer: sigUpdateSigner, hash: configHash, signature: signature});
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,23 +211,23 @@ contract MultiOwnableWallet is OPStackKeystore, ERC1271, TransientUUPSUpgradeabl
     }
 
     /// @inheritdoc Keystore
-    function _hookIsNewConfigAuthorized(ConfigLib.Config calldata newConfig, bytes calldata authorizationProof)
+    function _hookIsConfigAuthorized(ConfigLib.Config calldata config, bytes calldata authorizationProof)
         internal
         view
         override
         returns (bool)
     {
-        bytes32 newConfigHash = ConfigLib.hash({config: newConfig, account: address(this)});
+        bytes32 configHash = ConfigLib.hash({config: config, account: address(this)});
         (bytes memory signatureAuth,) = abi.decode(authorizationProof, (bytes, bytes));
 
         // Ensure the update is authorized.
-        return _isValidSignature({hash: newConfigHash, signature: signatureAuth});
+        return _isValidSignature({hash: configHash, signature: signatureAuth});
     }
 
     /// @inheritdoc Keystore
-    function _hookApplyNewConfig(ConfigLib.Config calldata newConfig) internal override returns (bool) {
+    function _hookApplyConfig(ConfigLib.Config calldata config) internal override returns (bool) {
         // NOTE: Only decode the implementation as we don't know if an uprade will be performed or not yet.
-        address implementation = abi.decode(newConfig.data, (address));
+        address implementation = abi.decode(config.data, (address));
 
         // Read the current implementation and if it changed perform the upgrade.
         address currentImpl;
@@ -242,14 +239,14 @@ contract MultiOwnableWallet is OPStackKeystore, ERC1271, TransientUUPSUpgradeabl
             _allowUpgrade();
 
             // NOTE: Must be a public call as `upgradeToAndCall` accepts a `bytes calldata data`.
-            (, bytes memory data) = abi.decode(newConfig.data, (address, bytes));
+            (, bytes memory data) = abi.decode(config.data, (address, bytes));
             this.upgradeToAndCall({newImplementation: implementation, data: data});
             return true;
         }
 
         // Otherwise set the new signers.
-        (, address[] memory signers) = abi.decode(newConfig.data, (address, address[]));
-        bytes32 configHash = ConfigLib.hash({config: newConfig, account: address(this)});
+        (, address[] memory signers) = abi.decode(config.data, (address, address[]));
+        bytes32 configHash = ConfigLib.hash({config: config, account: address(this)});
         mapping(address signer => bool isSigner) storage signers_ = _sWallet().keystoreConfig[configHash].signers;
         for (uint256 i; i < signers.length; i++) {
             signers_[signers[i]] = true;

@@ -39,13 +39,13 @@ contract KeystoreBridge is KeystoreArbitrumPortal, KeystoreBasePortal, KeystoreO
 
         for (uint256 i; i < keystores.length; i++) {
             address keystore = keystores[i];
-            (bytes32 confirmedConfigHash, uint256 masterBlockTimestamp) = Keystore(keystore).confirmedConfigHash();
+            (bytes32 masterConfigHash, uint256 masterBlockTimestamp) = Keystore(keystore).masterConfigHashAndTimestamp();
 
             BinaryMerkleTreeLib.commitTo({
                 tree: tree,
                 // NOTE: The `dataHash` must commit to the `keystore` address, as it could potentially be malicious and
-                //       return an arbitrary `confirmedConfigHash`.
-                dataHash: keccak256(abi.encodePacked(keystore, confirmedConfigHash, masterBlockTimestamp))
+                //       return an arbitrary `masterConfigHash`.
+                dataHash: keccak256(abi.encodePacked(keystore, masterConfigHash, masterBlockTimestamp))
             });
         }
     }

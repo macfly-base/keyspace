@@ -20,7 +20,7 @@ abstract contract KeystoreBridgeableExt is Keystore {
     //                                              ERRORS                                            //
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Thrown when the confirmed Keystore config Merkle proof verification fails against the `KeystoreBridge`
+    /// @notice Thrown when the master Keystore config Merkle proof verification fails against the `KeystoreBridge`
     ///         received root.
     error InvalidKeystoreConfigMerkleProof();
 
@@ -39,15 +39,15 @@ abstract contract KeystoreBridgeableExt is Keystore {
     //                                        PUBLIC FUNCTIONS                                        //
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Confirms a Keystore config from the `KeystoreBridge` contract.
+    /// @notice Syncs a master Keystore config from the `KeystoreBridge` contract.
     ///
-    /// @param masterConfig The new master configuration to synchronize.
-    /// @param newMasterBlockTimestamp The block timestamp for the new master configuration.
+    /// @param masterConfig The master config to sync.
+    /// @param masterBlockTimestamp The block timestamp for the `masterConfig`.
     /// @param index The index of the leaf in the Merkle tree.
     /// @param siblings The Merkle proof sibling hashes.
-    function confirmConfigFromBridge(
+    function syncConfigFromBridge(
         ConfigLib.Config calldata masterConfig,
-        uint256 newMasterBlockTimestamp,
+        uint256 masterBlockTimestamp,
         uint256 index,
         bytes32[] calldata siblings
     ) external {
@@ -55,36 +55,36 @@ abstract contract KeystoreBridgeableExt is Keystore {
         bytes32 receivedRoot = KeystoreBridge(keystoreBridge).receivedRoot(masterChainId);
 
         // Recompute the data hash that was committed in the root.
-        bytes32 newConfirmedConfigHash = ConfigLib.hash({config: masterConfig, account: address(this)});
+        bytes32 masterConfigHash = ConfigLib.hash({config: masterConfig, account: address(this)});
 
-        // Ensure the provided `masterConfig` and `newMasterBlockTimestamp` are valid for this Keystore contract.
+        // Ensure the provided `masterConfig` and `masterBlockTimestamp` are valid for this Keystore contract.
         require(
             BinaryMerkleTreeLib.isValid({
                 root_: receivedRoot,
-                // NOTE: Ensure that the `dataHash` commits to `address(this)`, proving that `newConfirmedConfigHash`
-                //       was effectively fetched from this contract on the master chain.
-                dataHash: keccak256(abi.encodePacked(address(this), newConfirmedConfigHash, newMasterBlockTimestamp)),
+                // NOTE: Ensure that the `dataHash` commits to `address(this)`, proving that `masterConfigHash` was
+                //       effectively fetched from this contract on the master chain.
+                dataHash: keccak256(abi.encodePacked(address(this), masterConfigHash, masterBlockTimestamp)),
                 index: index,
                 siblings: siblings
             }),
             InvalidKeystoreConfigMerkleProof()
         );
 
-        // Ensure we are going forward when confirming a new config.
-        (, uint256 masterBlockTimestamp) = confirmedConfigHash();
+        // Ensure we are going forward when syncing a master config.
+        (, uint256 currentMasterBlockTimestamp) = masterConfigHashAndTimestamp();
         require(
-            newMasterBlockTimestamp > masterBlockTimestamp,
-            ConfirmedConfigOutdated({
-                currentMasterBlockTimestamp: masterBlockTimestamp,
-                newMasterBlockTimestamp: newMasterBlockTimestamp
+            masterBlockTimestamp > currentMasterBlockTimestamp,
+            MasterConfigOutdated({
+                currentMasterBlockTimestamp: currentMasterBlockTimestamp,
+                newMasterBlockTimestamp: masterBlockTimestamp
             })
         );
 
-        // Apply the new confirmed config to the Keystore storage.
-        _applyNewConfirmedConfig({
-            newConfirmedConfigHash: newConfirmedConfigHash,
-            newConfirmedConfig: masterConfig,
-            newMasterBlockTimestamp: newMasterBlockTimestamp
+        // Apply the master config to the Keystore storage.
+        _applyMasterConfig({
+            masterConfigHash: masterConfigHash,
+            masterConfig: masterConfig,
+            masterBlockTimestamp: masterBlockTimestamp
         });
     }
 }
